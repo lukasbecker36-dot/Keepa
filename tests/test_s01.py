@@ -285,3 +285,41 @@ def test_max_viable_cost_is_recomputed_from_the_achievable_price():
     survivors, _ = s01.apply_newcomer_pricing(pairs, lambda cat: (3000, 14))
     assert survivors, "3000 should still leave room to source"
     assert survivors[0][1].max_viable_cost_p < before
+
+
+# -- the re-anchored price band ------------------------------------------
+
+
+def test_price_floor_is_set_by_sourcing_share_not_fee_arithmetic():
+    """At the floor, a workable share of the sale price must remain for goods."""
+    share = fees.max_viable_cost(
+        s01.PRICE_FLOOR_P, referral_pct=15.0, postage_p=295
+    ) / s01.PRICE_FLOOR_P
+    assert share >= 0.35, "floor too low; nothing left to source within"
+    below = fees.max_viable_cost(1000, referral_pct=15.0, postage_p=295) / 1000
+    assert below < 0.35, "the floor should sit above where sourcing collapses"
+
+
+def test_incumbent_far_above_its_category_median_is_dropped():
+    """Its sales prove demand at GBP 27 for a known name. They say nothing about
+    demand at GBP 10 for a no-name, so the evidence is about the wrong product --
+    even though entering at the median would leave sourcing room."""
+    pairs = [_pair(2699)]
+    survivors, notes = s01.apply_newcomer_pricing(pairs, lambda cat: (1800, 15))
+    assert survivors == []
+    assert "wrong product" in notes[0] or "not the one we would launch" in notes[0]
+
+
+def test_incumbent_at_its_category_median_survives():
+    pairs = [_pair(3000)]
+    survivors, _ = s01.apply_newcomer_pricing(pairs, lambda cat: (2900, 15))
+    assert len(survivors) == 1
+
+
+def test_headroom_rewards_sourcing_share_not_cheapness():
+    """The brief's (60 - price) rewarded low prices. A higher price amortises
+    the flat costs and leaves MORE of the sale for goods, which is what decides
+    whether a quote can work."""
+    cheap = analyse(make_product(price_p=1600), now=NOW)
+    dearer = analyse(make_product(price_p=4000), now=NOW)
+    assert dearer.headroom > cheap.headroom

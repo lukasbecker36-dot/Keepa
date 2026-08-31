@@ -78,7 +78,19 @@ from strategies.s02_amazon_oos import MAX_PARCEL_VOLUME_MM3
 
 # -- tunable thresholds ---------------------------------------------------
 
-PRICE_FLOOR_P = 2500
+# The brief's GBP 25 floor was anchored to Amazon fee arithmetic, and for a
+# RESALE strategy that is right. For private label it is the wrong anchor: what
+# matters is the markup MULTIPLE, not the absolute spread. Measured against the
+# fee model, the share of the sale price left over for goods is:
+#     GBP 10 -> 20% (unviable)   GBP 15 -> 40%   GBP 20 -> 51%   GBP 30 -> 61%
+# So GBP 15 is the real floor -- below it a supplier must quote under GBP 3.36,
+# which only exists for very small items.
+#
+# Lowering the floor also fixes the deeper problem. A GBP 25 floor in categories
+# whose medians are GBP 7-14 selects for products priced 2-4x above their own
+# category -- and that premium is brand equity, not an opening. See
+# MAX_PREMIUM_OVER_MEDIAN below.
+PRICE_FLOOR_P = 1500
 PRICE_CEILING_P = 6000
 MAX_CURRENT_RANK = 30_000
 MAX_REVIEWS = 200
@@ -106,7 +118,13 @@ PEER_SAMPLE_SIZE = 20         # products sampled per leaf category
 PEER_CACHE_DAYS = 7           # category price levels do not move by the hour
 PEER_MIN_SALE_EVENTS = 5      # per peer, before its price is believed
 NEWCOMER_PRICE_FACTOR = 1.0   # enter at the category median, not above it
-BRAND_PREMIUM_FLAG = 1.5      # incumbent above this x median is trading on a name
+# An incumbent priced far above its category median is commercially a DIFFERENT
+# product from the one we would launch. Its sales prove demand at GBP 27 for a
+# known name; they say nothing about demand at GBP 10 for a no-name. Beyond this
+# multiple the demand evidence is about the wrong product, so the row goes --
+# even when the median itself would still leave sourcing room.
+MAX_PREMIUM_OVER_MEDIAN = 1.4
+TARGET_GOODS_SHARE = 0.5      # goods as a share of sale price; 50% scores 1.0
 MIN_VIABLE_LANDED_P = 200     # below GBP 2 landed, nothing is sourceable
 
 HISTORY_DAYS = 180
@@ -274,8 +292,13 @@ def _score(a: Analysis) -> None:
         1 - 0.7 * (a.review_velocity / MAX_REVIEW_VELOCITY), 0.3, 1.0
     )
     a.weakness = weakness * velocity_penalty
+    # Reward SOURCING headroom, not cheapness. The brief's (60 - price) term
+    # rewarded low prices, but for private label a higher price amortises the
+    # flat costs and leaves a bigger share of the sale for goods -- which is
+    # what actually decides whether a supplier quote can work.
+    sell = a.achievable_price_p or a.price_p
     a.headroom = clamp(
-        (PRICE_CEILING_P - a.price_p) / (PRICE_CEILING_P - PRICE_FLOOR_P)
+        (a.max_viable_cost_p / sell / TARGET_GOODS_SHARE) if sell else 0.0
     )
     a.demand = clamp(math.log1p(a.monthly_sold) / math.log1p(DEMAND_REFERENCE_UNITS))
     a.score = 100 * a.stability * a.weakness * a.headroom * a.demand
@@ -383,6 +406,14 @@ def apply_newcomer_pricing(
             is_media=fees.is_media_product(product),
             postage_p=fees.postage_for(product.get("packageWeight") or None),
         )
+        if a.brand_premium > MAX_PREMIUM_OVER_MEDIAN:
+            notes.append(
+                f"{a.asin} dropped: incumbent GBP {a.price_p/100:.2f} is "
+                f"{(a.brand_premium - 1) * 100:.0f}% above the category median "
+                f"GBP {peer_p/100:.2f}, so its sales evidence is about a branded "
+                f"product, not the one we would launch"
+            )
+            continue
         if a.max_viable_cost_p < MIN_VIABLE_LANDED_P:
             notes.append(
                 f"{a.asin} dropped: incumbent GBP {a.price_p/100:.2f} is "
