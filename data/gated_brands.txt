@@ -1,0 +1,106 @@
+# Brands requiring Amazon UK approval to list. One per line, case-insensitive.
+# Matched against the product's `brand` and `manufacturer` fields exactly, and
+# against the title on word boundaries.
+#
+# CLAUDE.md says review this quarterly. Last reviewed: 2026-08-31.
+#
+# IMPORTANT for Strategy 2: that strategy sources FROM AMAZON, and Amazon retail
+# receipts are NOT accepted as ungating invoices. A gated brand there is
+# unlistable regardless of score -- this list is load-bearing, not advisory.
+#
+# Gating is account-specific. If you hold approval for a brand, delete its line
+# rather than editing code. Anything caught here still appears in excluded.csv,
+# so a brand you unexpectedly have access to is easy to spot.
+
+# --- from CLAUDE.md ---
+Nike
+Adidas
+LEGO
+Apple
+Samsung
+Sony
+Disney
+Hasbro
+Mattel
+Beats
+
+# --- commonly gated on Amazon UK ---
+Bose
+Sennheiser
+JBL
+Dyson
+Nespresso
+Nintendo
+PlayStation
+Xbox
+Microsoft
+Bosch
+DeWalt
+Makita
+Ray-Ban
+Oakley
+Under Armour
+Puma
+Reebok
+The North Face
+Columbia
+Calvin Klein
+Tommy Hilfiger
+Ralph Lauren
+Levi's
+Michael Kors
+Fossil
+Casio
+Garmin
+Fitbit
+GoPro
+Canon
+Nikon
+Philips
+Braun
+Oral-B
+Gillette
+Nivea
+L'Oreal
+Maybelline
+Estee Lauder
+Clinique
+Chanel
+Dior
+Gucci
+Prada
+Yankee Candle
+Optimum Nutrition
+MyProtein
+Huel
+Nutribullet
+NutriBullet
+Tefal
+Le Creuset
+Joseph Joseph
+OXO
+Brita
+Fairy
+Persil
+Ariel
+Pampers
+Huggies
+Johnson's
+Sudocrem
+
+# --- added 2026-08-31 after a live scan surfaced them ---
+Crocs
+Birkenstock
+UGG
+Skechers
+New Balance
+Vans
+Converse
+Timberland
+Clarks
+Dr Martens
+Havaianas
+Lacoste
+Superdry
+Barbour
+Joules

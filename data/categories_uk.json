@@ -1,0 +1,141 @@
+{
+  "_comment": [
+    "Amazon UK root category IDs for Strategy 1, harvested from live product",
+    "payloads (categoryTree) rather than typed from a browse-node list.",
+    "",
+    "These are ROOT nodes. Keepa's categories_include matches subcategories, so",
+    "a root scopes the scan to a coherent slice without needing a full leaf",
+    "tree. Narrow to leaves later once a root proves productive -- the leaf id",
+    "is in every candidate's payload, so that costs nothing to discover.",
+    "",
+    "`enabled` reflects whether a root is worth scanning for PRIVATE LABEL, not",
+    "whether it sells. Most disabled ones are excluded by the negative filters",
+    "anyway; scoping them out server-side saves the tokens instead of spending",
+    "them to be rejected locally. An unscoped scan returned 37 rejects from 50.",
+    "",
+    "rotate: 2 enabled categories per night (PLAN.md section 5); the cursor",
+    "lives in the SQLite meta table so a missed night resumes in place."
+  ],
+  "categories": [
+    {
+      "id": 3146281,
+      "name": "Home & Garden",
+      "enabled": true,
+      "why": "Commodity homeware is the classic private-label target: no compliance regime, light, cheap to make, weak incumbents."
+    },
+    {
+      "id": 192413031,
+      "name": "Stationery & Office Supplies",
+      "enabled": true,
+      "why": "Unregulated, light, high-repeat. Desk organisers and similar are exactly the shape the brief describes."
+    },
+    {
+      "id": 340840031,
+      "name": "Pet Supplies",
+      "enabled": true,
+      "why": "Large and commoditised. Avoid pet FOOD (FSA regime) -- the compliance filter catches it locally."
+    },
+    {
+      "id": 79903031,
+      "name": "DIY & Tools",
+      "enabled": true,
+      "why": "Hand tools and fixings are unregulated and durable. Mains-powered items are excluded by the UKCA filter."
+    },
+    {
+      "id": 318949011,
+      "name": "Sports & Outdoors",
+      "enabled": true,
+      "why": "Accessories (straps, mats, bottles) are manufacturable. Apparel is sizing-and-returns hell; avoid at leaf level."
+    },
+    {
+      "id": 248877031,
+      "name": "Automotive",
+      "enabled": true,
+      "why": "Accessories and organisers. The jockey-wheel candidate from the first scan sits here."
+    },
+    {
+      "id": 5866054031,
+      "name": "Business, Industry & Science",
+      "enabled": true,
+      "why": "Thin B2B listings with weak presentation and low review counts; under-served on listing quality."
+    },
+    {
+      "id": 213077031,
+      "name": "Lighting",
+      "enabled": false,
+      "why": "Mains-powered and battery products dominate: UKCA and hazmat. Revisit only for non-electrical fittings."
+    },
+    {
+      "id": 468292,
+      "name": "Toys & Games",
+      "enabled": false,
+      "why": "Under-14 safety testing, and dominated by licensed IP. The brief excludes it and the filters agree."
+    },
+    {
+      "id": 11961407031,
+      "name": "Fashion",
+      "enabled": false,
+      "why": "Sizing, returns, and heavy brand gating. Not a first-time-seller category."
+    },
+    {
+      "id": 117332031,
+      "name": "Beauty",
+      "enabled": false,
+      "why": "CPSR requirement. Explicitly out of scope per CLAUDE.md."
+    },
+    {
+      "id": 65801031,
+      "name": "Health & Personal Care",
+      "enabled": false,
+      "why": "FSA for supplements, medical-device rules for the rest. The CPAP cushion that slipped through the first scan came from here."
+    },
+    {
+      "id": 340834031,
+      "name": "Grocery",
+      "enabled": false,
+      "why": "FSA regime, short shelf life."
+    },
+    {
+      "id": 229816,
+      "name": "CDs & Vinyl",
+      "enabled": false,
+      "why": "Media: cannot be manufactured. Returned vinyl records on the first unscoped scan."
+    },
+    {
+      "id": 283926,
+      "name": "DVD & Blu-ray",
+      "enabled": false,
+      "why": "Media: cannot be manufactured."
+    },
+    {
+      "id": 300703,
+      "name": "PC & Video Games",
+      "enabled": false,
+      "why": "Media plus platform gating (Nintendo, PlayStation, Xbox)."
+    },
+    {
+      "id": 340831031,
+      "name": "Computers & Accessories",
+      "enabled": false,
+      "why": "UKCA, batteries, and brand gating dominate. Revisit for passive accessories only."
+    },
+    {
+      "id": 560798,
+      "name": "Electronics & Photo",
+      "enabled": false,
+      "why": "UKCA and batteries."
+    },
+    {
+      "id": 59624031,
+      "name": "Baby Products",
+      "enabled": false,
+      "why": "Safety regime overlaps the under-14 toy rules; high liability for a first-time seller."
+    },
+    {
+      "id": 340837031,
+      "name": "Musical Instruments & DJ",
+      "enabled": false,
+      "why": "Thin volume at this price band and heavily brand-driven."
+    }
+  ]
+}
