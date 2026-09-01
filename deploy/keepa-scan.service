@@ -10,8 +10,8 @@ WorkingDirectory=/opt/keepa
 EnvironmentFile=/opt/keepa/.env
 # --nightly uses the lower token reserve so the scheduled run takes priority
 # over any ad-hoc query. The bucket belongs to the API key, not the process.
-ExecStart=/opt/keepa/.venv/bin/python run.py --strategy s02 --nightly
-ExecStart=/opt/keepa/.venv/bin/python run.py --strategy s01 --nightly
+ExecStart=/opt/keepa/.venv/bin/python run.py --strategy s02 --nightly --notify
+ExecStart=/opt/keepa/.venv/bin/python run.py --strategy s01 --nightly --notify
 # A scan is mostly SLEEPING on token refill at 5/min, not computing. Give it
 # room to finish rather than killing a run that is waiting legitimately.
 TimeoutStartSec=4h
@@ -22,6 +22,10 @@ IOWeight=20
 MemoryMax=1G
 StandardOutput=journal
 StandardError=journal
+
+# A silent failure is the worst outcome: the operator believes a scan ran
+# when it did not.
+OnFailure=keepa-scan-failed.service
 
 [Install]
 WantedBy=multi-user.target

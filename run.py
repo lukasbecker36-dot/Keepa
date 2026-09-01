@@ -16,7 +16,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from core import config, filters, report
+from core import config, filters, notify, report
 from core.cache import Cache
 from core.client import (
     RESERVE_INTERACTIVE,
@@ -101,6 +101,10 @@ def main() -> int:
     ap.add_argument("--nightly", action="store_true", help="use the lower reserve")
     ap.add_argument("--dry-run", action="store_true", help="plan, spend nothing")
     ap.add_argument("--rescore", action="store_true", help="re-score cache, free")
+    ap.add_argument(
+        "--notify", action="store_true",
+        help="send a Telegram digest when the run finishes",
+    )
     args = ap.parse_args()
 
     if args.rescore:

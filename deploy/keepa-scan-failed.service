@@ -1,0 +1,8 @@
+[Unit]
+Description=Report a failed Keepa scan to Telegram
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/keepa
+EnvironmentFile=/opt/keepa/.env
+ExecStart=/opt/keepa/.venv/bin/python -c "import sys; sys.path.insert(0, '/opt/keepa'); from core import notify; import subprocess; log = subprocess.run(['journalctl','-u','keepa-scan','-n','25','--no-pager'],     capture_output=True, text=True).stdout; notify.notify_failure(log or 'keepa-scan failed; no journal output')"
