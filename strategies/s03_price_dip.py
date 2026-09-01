@@ -22,7 +22,7 @@ THE TRAP, AND THE FILTER THAT DEFENDS AGAINST IT
     wave kills demand. Buying into those is buying a falling knife -- the price
     keeps going and never comes back.
 
-    Two filters separate a flip from a knife, and both are load-bearing:
+    Three filters separate a flip from a knife, and all are load-bearing:
 
       1. RECOVERED FROM SIMILAR LOWS >= 2x IN 180 DAYS. This is the evidence
          that the price BEHAVES like a mean-reverting series rather than a
@@ -34,6 +34,17 @@ THE TRAP, AND THE FILTER THAT DEFENDS AGAINST IT
       2. DEMAND INTACT. The current sales rank must sit close to its own 90-day
          level. If the rank collapsed alongside the price, the product is dying,
          not on sale, and the "dip" is a demand story wearing a price costume.
+
+      3. THE REVERT PRICE WAS ACTUALLY PAID. The price we plan to relist at is
+         the median price at OBSERVED sales above the dip, not the raw median of
+         asks. A price can be ASKED for months with almost nothing selling at it
+         -- Amazon out of stock, third parties asking high, few takers -- and a
+         median of asks scores that phantom level as the reversion. The HP Poly
+         Blackwire chart is exactly this: months near £70 while the sales rank
+         got WORSE, with units actually changing hands at £27-38. Pricing the
+         reversion off the £70 ask recommends a profit that never existed. Each
+         sales-rank drop is one unit sold; we read the price then and require a
+         real cluster of sales above the dip, or the row is rejected.
 
     A structural collapse also defeats itself against the reference over time:
     once the price has sat at its new low for 90 days, the 90-day median tracks
@@ -96,6 +107,12 @@ MAX_RANK_AVG = 50_000         # real ongoing demand (90-day median rank)
 RANK_DRIFT_TOLERANCE = 0.30   # current rank within 30% of its 90-day level, or
                               # the dip is a demand collapse, not a price dip
 
+MIN_RANK_DROP_PCT = 0.10      # a rank improvement this sharp counts as one sale
+MIN_REVERT_SALES = 3          # units must have SOLD above the dip, or the price
+                              # we plan to relist at is a phantom ask. Below this
+                              # there is no basis for a revert price. See the
+                              # revert block in analyse() for why this matters.
+
 MIN_DATA_COVERAGE = 0.80      # of the 180d window, or the statistics are noise
 MIN_PROFIT_PER_UNIT_P = fees.MIN_PROFIT_PER_UNIT_P   # £3.00
 TEST_ORDER_UNITS = 5          # units per position, for capital_required
@@ -150,7 +167,9 @@ class Analysis:
     window: Window | None = None
     current_price_p: int = 0       # the BUY price -- today's dip
     reference_price_p: int = 0     # 90-day median -- the average dipped below
-    revert_price_p: int = 0        # 180-day median -- what to relist at
+    revert_price_p: int = 0        # median price AT OBSERVED SALES above the dip
+    revert_asked_p: int = 0        # 180-day median of asks -- for disclosure only
+    revert_sale_events: int = 0    # units seen selling above the dip
     range_low_p: int = 0
     range_high_p: int = 0
     range_width: float = 0.0
@@ -249,15 +268,17 @@ def analyse(product: dict, *, now: int | None = None) -> Analysis:
         return a
     a.current_price_p = current
 
-    # The average the dip is measured against, and the level to relist at.
+    # The average the dip is measured against, and the ASKED typical price. The
+    # asked median sets the recovery band and is reported for disclosure, but it
+    # is NOT the price we relist at -- that comes from observed sales below.
     ref_window = hist.window(REFERENCE_DAYS, now=now)
     reference = new.weighted_median(ref_window.start, ref_window.end)
-    revert = new.weighted_median(window.start, window.end)
-    if not reference or not revert:
+    revert_asked = new.weighted_median(window.start, window.end)
+    if not reference or not revert_asked:
         a.rejected = "no_reference_price"
         return a
     a.reference_price_p = reference
-    a.revert_price_p = revert
+    a.revert_asked_p = revert_asked
 
     a.dip_pct = 1.0 - current / reference
     if a.dip_pct < MIN_DIP_PCT:
@@ -283,8 +304,8 @@ def analyse(product: dict, *, now: int | None = None) -> Analysis:
         return a
 
     # THE load-bearing filter. See the module docstring.
-    low_ceiling = int(revert * (1.0 - MIN_DIP_PCT))
-    recovery_level = int(revert * (1.0 - RECOVERY_TOLERANCE))
+    low_ceiling = int(revert_asked * (1.0 - MIN_DIP_PCT))
+    recovery_level = int(revert_asked * (1.0 - RECOVERY_TOLERANCE))
     a.recoveries, a.days_to_revert = _count_recoveries(
         new, window, low_ceiling, recovery_level
     )
@@ -294,6 +315,40 @@ def analyse(product: dict, *, now: int | None = None) -> Analysis:
         # average down to meet it.
         a.rejected = f"only_{a.recoveries}_recoveries"
         return a
+
+    # THE REVERT PRICE, VALIDATED AGAINST SALES -- price PAID, not price ASKED.
+    #
+    # The raw asked median can be dragged up by a months-long elevated price that
+    # almost nothing sold at (Amazon out of stock, third parties asking high, few
+    # takers). Relisting at that phantom level is the classic dip-flip trap: the
+    # HP Poly Blackwire chart is exactly this -- the price spent months near £70
+    # while the sales rank got WORSE, and units only changed hands down at
+    # £27-38. Scoring the £70 ask as the reversion recommends a profit that was
+    # never available.
+    #
+    # So the revert price is the median price at OBSERVED sales, counting only
+    # sales that occurred meaningfully ABOVE the current dip (we will not relist
+    # into the dip zone). Each sales-rank drop is one unit sold; read the price
+    # in force then. This is Strategy 2's paid-not-asked discipline applied to
+    # the SELL side. Requiring MIN_REVERT_SALES such sales is what makes a
+    # phantom upside fail rather than score.
+    exclude_below = int(current * (1.0 + MIN_DIP_PCT))
+    paid: list[int] = []
+    for ts in sales.drops_in_windows([window], min_drop_pct=MIN_RANK_DROP_PCT):
+        price = new.at(ts)
+        if price is not None and price >= exclude_below:
+            paid.append(price)
+    a.revert_sale_events = len(paid)
+    if len(paid) < MIN_REVERT_SALES:
+        # Nothing measurably sold above the dip. Whatever the asks said, there is
+        # no demonstrated market at a price worth reverting to.
+        a.rejected = f"only_{len(paid)}_sales_above_dip"
+        return a
+    paid.sort()
+    mid = len(paid) // 2
+    a.revert_price_p = (
+        paid[mid] if len(paid) % 2 else (paid[mid - 1] + paid[mid]) // 2
+    )
 
     # Demand intact: the rank must not have collapsed alongside the price.
     rank_ref = sales.weighted_median(ref_window.start, ref_window.end)
@@ -321,9 +376,9 @@ def analyse(product: dict, *, now: int | None = None) -> Analysis:
         a.rejected = f"unpostable: {exc}"
         return a
 
-    a.expected_delta_p = revert - current
+    a.expected_delta_p = a.revert_price_p - current
     a.profit_per_unit_p = fees.profit(
-        revert,
+        a.revert_price_p,
         current,
         referral_pct=referral_pct,
         is_media=is_media,
@@ -356,7 +411,8 @@ def _reason(a: Analysis) -> str:
             f"£{a.current_price_p / 100:.2f} vs 90d avg £{a.reference_price_p / 100:.2f} "
             f"(-{a.dip_pct * 100:.0f}%)",
             f"recovered {a.recoveries}x in {a.window.days:.0f}d (revert {days})",
-            f"relist £{a.revert_price_p / 100:.2f}, £{a.profit_per_unit_p / 100:.2f}/unit",
+            f"relist £{a.revert_price_p / 100:.2f} at {a.revert_sale_events} "
+            f"observed sales, £{a.profit_per_unit_p / 100:.2f}/unit",
         ]
     )
 
@@ -369,6 +425,11 @@ def _notes(a: Analysis) -> str:
         f"({a.range_width * 100:.0f}% wide)",
         f"rank now {a.rank_now:,} vs 90d {a.rank_reference:,}",
     ]
+    if a.revert_asked_p > a.revert_price_p:
+        notes.append(
+            f"asks reached £{a.revert_asked_p / 100:.2f} but units sold at "
+            f"£{a.revert_price_p / 100:.2f} -- relist target is the PAID price"
+        )
     if a.volume_is_nominal:
         notes.append("no monthlySold figure; volume is nominal, ranking unreliable")
     return "; ".join(notes)
@@ -392,6 +453,8 @@ def to_candidate(product: dict, a: Analysis) -> Candidate:
         extra={
             "reference_price_p": a.reference_price_p,
             "revert_price_p": a.revert_price_p,
+            "revert_asked_p": a.revert_asked_p,
+            "revert_sale_events": a.revert_sale_events,
             "dip_pct": round(a.dip_pct * 100, 1),
             "range_low_p": a.range_low_p,
             "range_high_p": a.range_high_p,
@@ -433,6 +496,9 @@ class PriceDipStrategy(Strategy):
             "The trade: buy today's low, hold, relist at the reverted average.",
             "'Recovered >= 2x' is the falling-knife defence -- a dip that has "
             "never come back is not scored.",
+            "Relist price is the median price AT OBSERVED SALES above the dip, "
+            "not the raw median of asks -- a months-long phantom ask with no "
+            "sales behind it does not set the reversion (the HP Poly lesson).",
             "Dip prices use csv[1] NEW (free). Top rows re-checked against "
             "csv[18] buy box -- see buybox_verified in the CSV.",
         ]
