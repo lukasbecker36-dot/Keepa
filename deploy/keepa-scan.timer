@@ -2,9 +2,11 @@
 Description=Run the Keepa sourcing scan nightly
 
 [Timer]
-# 01:30 Europe/London. Well clear of the hyperaster services' busy hours, and
-# it leaves the whole night for token refill at 5/min.
-OnCalendar=*-*-* 01:30:00
+# 01:30 Europe/London, stated explicitly. The box runs UTC, so an unqualified
+# time would drift an hour against the operator's clock every BST changeover --
+# and CLAUDE.md specifies Europe/London for all date logic. systemd 255 accepts
+# a timezone here.
+OnCalendar=*-*-* 01:30:00 Europe/London
 Persistent=true
 # The scan is not time-critical; jitter avoids colliding with anything else
 # that wakes on the half hour.
