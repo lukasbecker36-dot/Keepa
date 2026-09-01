@@ -1,0 +1,27 @@
+[Unit]
+Description=Keepa UK sourcing scan (nightly)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/keepa
+# The API key. Mode 600, never in the repo -- same convention as hyperaster.
+EnvironmentFile=/opt/keepa/.env
+# --nightly uses the lower token reserve so the scheduled run takes priority
+# over any ad-hoc query. The bucket belongs to the API key, not the process.
+ExecStart=/opt/keepa/.venv/bin/python run.py --strategy s02 --nightly
+ExecStart=/opt/keepa/.venv/bin/python run.py --strategy s01 --nightly
+# A scan is mostly SLEEPING on token refill at 5/min, not computing. Give it
+# room to finish rather than killing a run that is waiting legitimately.
+TimeoutStartSec=4h
+Nice=10
+# Keep well clear of the trading services sharing this box.
+CPUWeight=20
+IOWeight=20
+MemoryMax=1G
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
