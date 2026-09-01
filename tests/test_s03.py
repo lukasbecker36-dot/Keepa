@@ -79,13 +79,38 @@ def test_a_clean_dip_passes_and_measures_correctly():
     assert a.days_to_revert == pytest.approx(15.0)
 
 
-def test_scoring_is_profit_delta_times_monthly_sales():
+def test_scoring_is_profit_delta_times_units_we_can_actually_fund():
+    """Score is profit x units, but units are capped by the float.
+
+    Demand of 500/month is irrelevant when GBP 1,000 buys 38 units per cycle
+    and only 2 cycles fit in a month. Without the cap, high-volume products sort
+    to the top on demand that cannot be funded -- which is how Echo Show 5 and
+    Echo Spot took the top two places on the first live run.
+    """
     a = analyse(make_product(), now=NOW)
     postage = fees.postage_for(400, None)
     expected_profit = fees.profit(4000, 2600, referral_pct=15.0, postage_p=postage)
     assert a.profit_per_unit_p == expected_profit
     assert a.expected_delta_p == 4000 - 2600
-    assert a.score == pytest.approx(expected_profit * 500)
+
+    # GBP 1,000 / GBP 26.00 = 38.5 units per cycle; 30 / 15-day revert = 2 cycles.
+    assert a.capital_limited_units == pytest.approx(38.46 * 2, rel=0.01)
+    assert a.monthly_units < 500, "demand must be capped by capital"
+    assert a.score == pytest.approx(expected_profit * a.monthly_units)
+
+
+def test_high_volume_cannot_outrank_on_demand_it_cannot_fund():
+    """A product selling 5,000/month scores no better than one selling 200 if
+    the float can only turn over 80 units either way."""
+    lots = analyse(make_product(monthly_sold=5000), now=NOW)
+    some = analyse(make_product(monthly_sold=200), now=NOW)
+    assert lots.monthly_units == pytest.approx(some.monthly_units)
+
+
+def test_amazon_buy_box_products_are_excluded_by_the_finder():
+    """The dip on an Amazon-sold product is Amazon promoting its own stock, and
+    Amazon still holds the buy box when the price reverts."""
+    assert s03.SELECTION["buyBoxIsAmazon"] is False
 
 
 def test_days_to_revert_comes_from_prior_recovery_cycles():
@@ -243,8 +268,17 @@ def test_selection_bands_the_current_buy_price():
 
 
 def test_selection_prefilters_on_a_price_below_the_average():
-    """deltaPercent90 is negative when current sits below the 90-day average."""
-    assert s03.SELECTION["deltaPercent90_NEW_lte"] == -int(s03.MIN_DIP_PCT * 100)
+    """Keepa's deltaPercent is POSITIVE for a discount -- it measures how far
+    BELOW the average the current price sits.
+
+    This test previously asserted the opposite and so encoded the bug rather
+    than catching it. Verified live: `_lte: -20` returned 60 of 60 products
+    priced ABOVE their 90-day median (the exact opposite of a dip, and why the
+    first real run scored zero), while `_gte: 20` returned 20 of 20 genuine
+    dips from a 2,271 population.
+    """
+    assert s03.SELECTION["deltaPercent90_NEW_gte"] == int(s03.MIN_DIP_PCT * 100)
+    assert "deltaPercent90_NEW_lte" not in s03.SELECTION
 
 
 def test_selection_requires_real_ongoing_demand():

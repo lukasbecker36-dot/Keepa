@@ -99,6 +99,13 @@ RANK_DRIFT_TOLERANCE = 0.30   # current rank within 30% of its 90-day level, or
 MIN_DATA_COVERAGE = 0.80      # of the 180d window, or the statistics are noise
 MIN_PROFIT_PER_UNIT_P = fees.MIN_PROFIT_PER_UNIT_P   # £3.00
 TEST_ORDER_UNITS = 5          # units per position, for capital_required
+# Opportunity must be capped by the capital that can actually chase it. Score is
+# profit x units, and for a rank-8 product Keepa's monthlySold is in the
+# thousands -- which produced an "est. GBP 30,690/month" on a GBP 1,000 float.
+# Units are limited by what the float buys per cycle, and by how many cycles fit
+# in a month.
+CAPITAL_AVAILABLE_P = 100_000   # GBP 1,000 float
+MAX_CYCLES_PER_MONTH = 6.0      # a floor of ~5 days per buy/hold/sell cycle
 MISSING_VOLUME_UNITS = 1.0    # nominal monthly units when Keepa has no figure
 
 VERIFY_TOP_N = 20             # pass 2 buy-box confirmations
@@ -124,7 +131,13 @@ SELECTION = {
     "current_NEW_lte": PRICE_CEILING_P,
     # Currently well below the 90-day average. This is the dip, pre-filtered
     # server-side; analyse() confirms it against the real history.
-    "deltaPercent90_NEW_lte": -int(MIN_DIP_PCT * 100),
+    #
+    # SIGN: Keepa's deltaPercent is POSITIVE for a discount -- it measures how
+    # far BELOW the average the current price sits. Verified live: `_lte: -20`
+    # returned 60 of 60 products priced ABOVE their 90-day median (the exact
+    # opposite of a dip, and the reason the first run scored nothing), while
+    # `_gte: 20` returned 20 of 20 genuine dips out of a 2,271 population.
+    "deltaPercent90_NEW_gte": int(MIN_DIP_PCT * 100),
     # Real ongoing demand.
     "avg90_SALES_gte": 1,
     "avg90_SALES_lte": MAX_RANK_AVG,
@@ -133,6 +146,12 @@ SELECTION = {
     "packageWeight_gte": 1,
     "packageWeight_lte": 2000,
     "packageDimension_lte": MAX_PARCEL_VOLUME_MM3,
+    # Never trade against Amazon retail. If Amazon holds the buy box, the "dip"
+    # is usually Amazon promoting its own stock -- and when the price reverts
+    # Amazon is still there holding the buy box, so the sale is never winnable.
+    # Strategy 3's first live run ranked Echo Show 5 and Echo Spot first and
+    # second for exactly this reason.
+    "buyBoxIsAmazon": False,
     "isHazMat": False,
     "productType": [0],
     "singleVariation": True,
@@ -163,6 +182,7 @@ class Analysis:
     profit_per_unit_p: int = 0
     monthly_sold: int = 0
     monthly_units: float = 0.0
+    capital_limited_units: float = 0.0
     volume_is_nominal: bool = False
     score: float = 0.0
 
@@ -345,6 +365,17 @@ def analyse(product: dict, *, now: int | None = None) -> Analysis:
 
     # CLAUDE.md: score by expected revert delta x 30-day sales estimate. The
     # delta is expressed as net profit per unit so fees are already in it.
+    #
+    # But cap the units by the capital that can actually chase them. Demand of
+    # 3,000/month is irrelevant when GBP 1,000 buys 16 units a cycle -- without
+    # this, high-volume products always sort to the top on demand they cannot
+    # be funded to capture.
+    units_per_cycle = CAPITAL_AVAILABLE_P / a.current_price_p
+    cycles = MAX_CYCLES_PER_MONTH
+    if a.days_to_revert and a.days_to_revert > 0:
+        cycles = min(MAX_CYCLES_PER_MONTH, 30.0 / a.days_to_revert)
+    a.capital_limited_units = units_per_cycle * cycles
+    a.monthly_units = min(a.monthly_units, a.capital_limited_units)
     a.score = a.profit_per_unit_p * a.monthly_units
     return a
 
@@ -406,6 +437,7 @@ def to_candidate(product: dict, a: Analysis) -> Candidate:
             "rank_reference": a.rank_reference,
             "monthly_sold": a.monthly_sold,
             "monthly_units": round(a.monthly_units, 2),
+            "capital_limited_units": round(a.capital_limited_units, 2),
             "volume_is_nominal": a.volume_is_nominal,
         },
     )
