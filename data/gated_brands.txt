@@ -104,3 +104,26 @@ Lacoste
 Superdry
 Barbour
 Joules
+
+# --- Amazon's own devices: gated to Amazon, never resellable ---
+# Surfaced by Strategy 3, which ranked Echo Show 5 and Echo Spot first and
+# second. The "dip" on these is Amazon promoting its own hardware while holding
+# the buy box throughout -- unlistable AND uncompetable.
+Amazon
+Echo
+Echo Dot
+Echo Show
+Echo Spot
+Fire TV
+Fire Tablet
+Kindle
+Ring
+Blink
+eero
+Alexa
+Milwaukee
+DeWALT
+Stanley
+Bosch Professional
+DuPont
+Tyvek

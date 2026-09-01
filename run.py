@@ -26,7 +26,11 @@ from core.client import (
 )
 from strategies.base import Candidate, Excluded, ScanResult
 
-STRATEGIES = {"s02": "s02_amazon_oos", "s01": "s01_niche_discovery"}
+STRATEGIES = {
+    "s02": "s02_amazon_oos",
+    "s01": "s01_niche_discovery",
+    "s03": "s03_price_dip",
+}
 
 
 def build(name: str, client: KeepaClient, pages: int | None, verify: int):
@@ -43,6 +47,12 @@ def build(name: str, client: KeepaClient, pages: int | None, verify: int):
         )
 
         return NicheDiscoveryStrategy(client, pages=pages or S01_PAGES)
+    if name == "s03":
+        from strategies.s03_price_dip import FINDER_PAGES as S03_PAGES, PriceDipStrategy
+
+        return PriceDipStrategy(
+            client, pages=pages or S03_PAGES, verify_top_n=verify
+        )
     raise SystemExit(f"unknown strategy {name!r}; known: {', '.join(STRATEGIES)}")
 
 

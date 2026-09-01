@@ -169,6 +169,22 @@ VETERINARY_TERMS = (
     "milk replacer", "electrolyte supplement",
 )
 
+# Category paths that put a product inside the cosmetics/CPSR or medicinal
+# regimes regardless of how the title reads. A "Postpartum Recovery Essentials
+# Kit" topped a Strategy 3 run: the title names no regulated term, but its path
+# is Health & Personal Care > Intimate Hygiene > Intimate Care and its features
+# promise "pain relief".
+PERSONAL_CARE_CATEGORY_HINTS = (
+    "intimate hygiene", "intimate care", "personal care", "skin care",
+    "bath & body", "feminine care", "oral care", "shaving hair removal",
+    "sun care", "hair care",
+)
+
+MEDICINAL_CLAIM_TERMS = (
+    "pain relief", "postpartum", "perineal", "haemorrhoid", "hemorrhoid",
+    "antiseptic", "antifungal", "medicated", "soothing relief",
+)
+
 VETERINARY_CATEGORY_HINTS = (
     "nonprescription medications", "wormers", "flea", "veterinary",
     "medications", "wound care", "ear care",
@@ -384,6 +400,17 @@ def compliance_heavy(product: dict) -> Rejection | None:
                 "compliance_toys_under_14",
                 f"safety testing; '{toy}' with age marker '{age}'",
             )
+
+    hit = first_match(text, MEDICINAL_CLAIM_TERMS)
+    if hit:
+        return Rejection("compliance_medicinal", f"medicinal claim; matches '{hit}'")
+
+    tree = normalise(
+        " ".join(str(e.get("name", "")) for e in (product.get("categoryTree") or []))
+    )
+    for hint in PERSONAL_CARE_CATEGORY_HINTS:
+        if contains_phrase(tree, hint):
+            return Rejection("compliance_cosmetics", f"CPSR regime; category '{hint}'")
 
     hit = first_match(text, MAINS_ELECTRICAL_TERMS)
     if hit:

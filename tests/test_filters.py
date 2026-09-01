@@ -371,3 +371,24 @@ def test_ordinary_pet_goods_still_pass():
 
 def test_lpg_fittings_are_hazmat():
     assert filters.hazmat(product(title="Gomet M22 LPG GPL Autogas Tank Refill Adapter"))
+
+
+def test_personal_care_caught_by_category_when_the_title_is_clean():
+    """Topped a Strategy 3 run. The title names no regulated term, but the
+    category path is Intimate Hygiene and the features promise pain relief."""
+    p = product(title="Frida Mom Postpartum Recovery Essentials Kit",
+                categoryTree=[{"name": "Health & Personal Care"},
+                              {"name": "Intimate Hygiene"},
+                              {"name": "Intimate Care"}])
+    assert filters.compliance_heavy(p)
+
+
+def test_medicinal_claims_are_caught():
+    assert filters.compliance_heavy(product(title="Cooling Pain Relief Spray"))
+
+
+def test_plain_goods_survive_the_new_category_rules():
+    assert filters.compliance_heavy(
+        product(title="Bamboo Drawer Organiser",
+                categoryTree=[{"name": "Home & Garden"}, {"name": "Storage"}])
+    ) is None
