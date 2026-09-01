@@ -12,9 +12,13 @@ EnvironmentFile=/opt/keepa/.env
 # over any ad-hoc query. The bucket belongs to the API key, not the process.
 ExecStart=/opt/keepa/.venv/bin/python run.py --strategy s02 --nightly --notify
 ExecStart=/opt/keepa/.venv/bin/python run.py --strategy s01 --nightly --notify
+ExecStart=/opt/keepa/.venv/bin/python run.py --strategy s03 --nightly --notify
 # A scan is mostly SLEEPING on token refill at 5/min, not computing. Give it
 # room to finish rather than killing a run that is waiting legitimately.
-TimeoutStartSec=4h
+# Three strategies now, each pacing against the same 300-token bucket at
+# 5/min. Budget roughly: s02 ~365, s01 ~244, s03 ~300 -- about 3 hours of
+# mostly-sleeping wall clock.
+TimeoutStartSec=6h
 Nice=10
 # Keep well clear of the trading services sharing this box.
 CPUWeight=20
