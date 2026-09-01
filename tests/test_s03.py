@@ -294,3 +294,16 @@ def test_recovery_band_has_hysteresis():
     """The low ceiling must sit below the recovery level, or jitter around one
     price would manufacture phantom cycles."""
     assert s03.MIN_DIP_PCT > s03.RECOVERY_TOLERANCE
+
+
+def test_current_rank_is_a_median_not_a_noisy_point():
+    """Sales rank swings hard day to day -- one real candidate read 9,142 to
+    18,081 inside a single week. A point reading would flip rows in and out of
+    the shortlist on noise, so 'current' is a 7-day median."""
+    p = make_product()
+    sales = p["csv"][csv_types.SALES]
+    # A single wild spike on the most recent reading must not condemn the row.
+    sales.extend([t(WINDOW_DAYS - 0.2), 90_000])
+    a = analyse(p, now=NOW)
+    assert a.passed, a.rejected
+    assert a.rank_now < 90_000, "one spike must not become the current rank"

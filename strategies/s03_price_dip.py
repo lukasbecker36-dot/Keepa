@@ -95,6 +95,12 @@ MIN_RECOVERIES = 2            # prior completed low->recovery cycles in 180 days
 MAX_RANK_AVG = 50_000         # real ongoing demand (90-day median rank)
 RANK_DRIFT_TOLERANCE = 0.30   # current rank within 30% of its 90-day level, or
                               # the dip is a demand collapse, not a price dip
+RANK_NOW_DAYS = 7             # "current" rank is a 7-day median, not a point.
+                              # Sales rank is volatile day to day -- the HP Poly
+                              # candidate read 9,142-18,081 across a single week
+                              # -- so a point reading can flip a row in or out on
+                              # noise. The 7-day median moves only on a real
+                              # trend.
 
 MIN_DATA_COVERAGE = 0.80      # of the 180d window, or the statistics are noise
 MIN_PROFIT_PER_UNIT_P = fees.MIN_PROFIT_PER_UNIT_P   # £3.00
@@ -317,7 +323,8 @@ def analyse(product: dict, *, now: int | None = None) -> Analysis:
 
     # Demand intact: the rank must not have collapsed alongside the price.
     rank_ref = sales.weighted_median(ref_window.start, ref_window.end)
-    rank_now = sales.current()
+    now_window = hist.window(RANK_NOW_DAYS, now=now)
+    rank_now = sales.weighted_median(now_window.start, now_window.end)
     if rank_ref is None or rank_ref <= 0 or rank_now is None or rank_now <= 0:
         a.rejected = "no_rank_data"
         return a
