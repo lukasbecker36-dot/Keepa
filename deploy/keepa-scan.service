@@ -2,6 +2,10 @@
 Description=Keepa UK sourcing scan (nightly)
 After=network-online.target
 Wants=network-online.target
+# A silent failure is the worst outcome: the operator believes a scan ran when
+# it did not. NOTE this belongs in [Unit] -- systemd ignores it in [Service]
+# with only a log warning, which is how it sat dead for the first live night.
+OnFailure=keepa-scan-failed.service
 
 [Service]
 Type=oneshot
@@ -26,10 +30,6 @@ IOWeight=20
 MemoryMax=1G
 StandardOutput=journal
 StandardError=journal
-
-# A silent failure is the worst outcome: the operator believes a scan ran
-# when it did not.
-OnFailure=keepa-scan-failed.service
 
 [Install]
 WantedBy=multi-user.target

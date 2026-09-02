@@ -155,3 +155,41 @@ def test_failure_notification_is_sent_even_though_scans_are_usually_quiet(monkey
     assert notify.notify_failure("Traceback: KeepaError") is True
     assert "FAILED" in sent["text"]
     assert "KeepaError" in sent["text"]
+
+
+# -- wiring: the gap that let a whole night pass silently -----------------
+
+
+def test_run_py_actually_calls_the_notifier():
+    """The first live nightly run completed all three strategies, found five
+    candidates, and told nobody.
+
+    core/notify.py was well tested in isolation; nothing asserted that run.py
+    CALLS it. A string replacement had silently failed to apply, leaving the
+    import and the --notify flag in place with no call site -- which looks
+    entirely healthy on inspection.
+    """
+    import pathlib
+
+    source = pathlib.Path(__file__).resolve().parents[1] / "run.py"
+    text = source.read_text(encoding="utf-8")
+    assert "notify.notify_scan(" in text, "run.py must call the notifier"
+    assert "args.notify" in text, "run.py must honour --notify"
+
+
+def test_the_systemd_unit_passes_notify_and_declares_onfailure():
+    """Two placement bugs, both silent:
+    --notify absent means no digest; OnFailure in [Service] instead of [Unit]
+    means systemd ignores it and failures go unreported."""
+    import configparser
+    import pathlib
+
+    unit_path = pathlib.Path(__file__).resolve().parents[1] / "deploy" / "keepa-scan.service"
+    raw = unit_path.read_text(encoding="utf-8")
+    assert raw.count("--notify") >= 1, "the unit must pass --notify"
+
+    parser = configparser.ConfigParser(strict=False)
+    parser.optionxform = str
+    parser.read_string(raw)
+    assert "OnFailure" in parser["Unit"], "OnFailure belongs in [Unit]"
+    assert "OnFailure" not in parser["Service"], "systemd ignores it in [Service]"

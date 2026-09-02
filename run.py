@@ -144,10 +144,23 @@ def main() -> int:
             return 1
         print(f"end:   {client.summary()}", flush=True)
 
-    written = report.write_all({STRATEGIES[args.strategy]: result})
+    results = {STRATEGIES[args.strategy]: result}
+    written = report.write_all(results)
     print(f"\n{len(result.candidates)} candidates, {len(result.excluded)} excluded")
     for path in written:
         print(f"  wrote {path}")
+
+    # Delivery. Files nobody reads may as well not exist -- and the FIRST live
+    # nightly run proved the point by completing all three strategies, finding
+    # five candidates, and telling nobody. A notification failure only reports;
+    # it must never fail a run that has already done its work.
+    if args.notify and not args.rescore:
+        if not notify.configured():
+            print("  (no Telegram credentials; set KEEPA_TELEGRAM_* in .env)")
+        elif notify.notify_scan(results, tokens_spent=result.tokens_spent):
+            print("  notified via Telegram")
+        else:
+            print("  (Telegram send failed; results are still on disk)")
     return 0
 
 
